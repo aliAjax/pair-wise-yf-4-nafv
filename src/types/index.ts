@@ -29,3 +29,15 @@ export interface SceneFormData {
   pedestrianStatus: PedestrianStatus
   note: string
 }
+
+/**
+ * 线路归并组：canonicalName 为目标（保留）名称，
+ * aliases 为曾用名（被挂入的名称）。记录本身只存原名称，归属靠这张表解析。
+ */
+export interface RouteGroup {
+  id: string
+  canonicalName: string
+  aliases: string[]
+}
+
+export type RouteFormData = SceneFormData

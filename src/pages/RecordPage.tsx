@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Bus, MapPin, Armchair, Clock, CloudSun, Signpost, TreePine, Users, FileText, Send } from 'lucide-react'
+import { Bus, MapPin, Armchair, Clock, CloudSun, Signpost, TreePine, Users, FileText, Send, Link2 } from 'lucide-react'
 import { useSceneStore } from '@/store/useSceneStore'
 import { getWeatherIcon, getTreeIcon, getPedestrianIcon, formatTimestamp } from '@/utils/sceneHelpers'
+import { resolveCanonicalName } from '@/services/routeGroups'
 import type { SceneFormData, Weather, TreeDensity, PedestrianStatus, SeatDirection } from '@/types'
 
 const WEATHERS: Weather[] = ['晴', '多云', '阴', '小雨', '大雨', '雪', '雾']
@@ -22,7 +23,10 @@ const initialForm: SceneFormData = {
 export default function RecordPage() {
   const saveScene = useSceneStore((s) => s.saveScene)
   const loadAll = useSceneStore((s) => s.loadAll)
+  const routeNames = useSceneStore((s) => s.routeNames)
+  const routeGroups = useSceneStore((s) => s.routeGroups)
   const [form, setForm] = useState<SceneFormData>(initialForm)
+  const [attachTo, setAttachTo] = useState('')
   const [now, setNow] = useState(new Date())
   const [showSuccess, setShowSuccess] = useState(false)
 
@@ -36,10 +40,22 @@ export default function RecordPage() {
   const update = <K extends keyof SceneFormData>(key: K, val: SceneFormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }))
 
+  const trimmedRoute = form.routeName.trim()
+  // 输入的名称是否已属于某条线路（作为目标名或曾用名出现过）
+  const isKnownRoute = !!trimmedRoute && routeNames.includes(trimmedRoute)
+  const isAliasName =
+    !!trimmedRoute && !isKnownRoute && routeGroups.some((g) => g.aliases.includes(trimmedRoute))
+  // 可挂入的目标线路：不含当前输入本身所属的那条
+  const attachableRoutes = isAliasName
+    ? routeNames.filter((r) => r !== resolveCanonicalName(trimmedRoute, routeGroups))
+    : routeNames.filter((r) => r !== trimmedRoute)
+  const attachTarget = attachableRoutes.includes(attachTo) ? attachTo : ''
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    saveScene(form)
+    saveScene(form, attachTarget || undefined)
     setShowSuccess(true)
+    setAttachTo('')
     setTimeout(() => {
       setShowSuccess(false)
       setForm(initialForm)
@@ -78,6 +94,38 @@ export default function RecordPage() {
               <input className="w-full bg-teal-850 text-mist-100 rounded-xl px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-dusk-400" value={form.segment} onChange={(e) => update('segment', e.target.value)} required />
             </div>
           </div>
+
+          {/* 把新名称挂到已有线路：记录仍写新名称，新名称记为目标线路的曾用名 */}
+          {routeNames.length > 0 && (
+            <div>
+              <label className="text-mist-300 text-xs mb-1 flex items-center gap-1">
+                <Link2 className="w-3 h-3" />归属线路（不选则作为新线路）
+              </label>
+              <select
+                value={attachTarget}
+                onChange={(e) => setAttachTo(e.target.value)}
+                className="w-full bg-teal-850 text-mist-100 rounded-xl px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-dusk-400"
+              >
+                <option value="">作为独立线路保存</option>
+                {attachableRoutes.map((name) => (
+                  <option key={name} value={name}>挂到「{name}」</option>
+                ))}
+              </select>
+              {attachTarget && (
+                <p className="mt-1 text-[11px] text-dusk-300">
+                  「{trimmedRoute || '新线路'}」将并入「{attachTarget}」，并记为其曾用名；编号与时间不会改动。
+                </p>
+              )}
+              {!attachTarget && isAliasName && (
+                <p className="mt-1 text-[11px] text-mist-400">
+                  该名称是「{resolveCanonicalName(trimmedRoute, routeGroups)}」的曾用名，本次记录将直接归入它。
+                </p>
+              )}
+              {!attachTarget && isKnownRoute && (
+                <p className="mt-1 text-[11px] text-mist-400">该线路已存在，本次记录将直接归入它。</p>
+              )}
+            </div>
+          )}
           <div>
             <label className="text-mist-300 text-xs mb-1 flex items-center gap-1"><Armchair className="w-3 h-3" />座位方向</label>
             <div className="flex gap-2">
