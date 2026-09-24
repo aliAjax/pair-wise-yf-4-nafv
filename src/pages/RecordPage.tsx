@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Bus, MapPin, Armchair, Clock, CloudSun, Signpost, TreePine, Users, FileText, Send } from 'lucide-react'
+import { Bus, MapPin, Armchair, Clock, CloudSun, Signpost, TreePine, Users, FileText, Send, GitMerge, Check } from 'lucide-react'
 import { useSceneStore } from '@/store/useSceneStore'
 import { getWeatherIcon, getTreeIcon, getPedestrianIcon, formatTimestamp } from '@/utils/sceneHelpers'
 import type { SceneFormData, Weather, TreeDensity, PedestrianStatus, SeatDirection } from '@/types'
@@ -21,10 +21,14 @@ const initialForm: SceneFormData = {
 
 export default function RecordPage() {
   const saveScene = useSceneStore((s) => s.saveScene)
+  const attachRoute = useSceneStore((s) => s.attachRoute)
   const loadAll = useSceneStore((s) => s.loadAll)
+  const routeGroups = useSceneStore((s) => s.routeGroups)
   const [form, setForm] = useState<SceneFormData>(initialForm)
   const [now, setNow] = useState(new Date())
   const [showSuccess, setShowSuccess] = useState(false)
+  const [attachMode, setAttachMode] = useState(false)
+  const [attachTarget, setAttachTarget] = useState('')
 
   useEffect(() => { loadAll() }, [loadAll])
 
@@ -38,11 +42,17 @@ export default function RecordPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // 先挂归属（原名称记为曾用名），再保存记录；记录里 routeName 仍是填写的原名称
+    if (attachMode && attachTarget && form.routeName.trim() !== attachTarget) {
+      attachRoute(form.routeName.trim(), attachTarget)
+    }
     saveScene(form)
     setShowSuccess(true)
     setTimeout(() => {
       setShowSuccess(false)
       setForm(initialForm)
+      setAttachMode(false)
+      setAttachTarget('')
     }, 1500)
   }
 
@@ -78,6 +88,53 @@ export default function RecordPage() {
               <input className="w-full bg-teal-850 text-mist-100 rounded-xl px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-dusk-400" value={form.segment} onChange={(e) => update('segment', e.target.value)} required />
             </div>
           </div>
+          {routeGroups.length > 0 && (
+            <div className="rounded-xl border border-teal-800 bg-teal-900/40 p-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setAttachMode((v) => !v)
+                  setAttachTarget('')
+                }}
+                className="flex w-full items-center gap-2 text-xs text-mist-300 transition-colors hover:text-dusk-300"
+              >
+                <GitMerge className="w-3.5 h-3.5 text-dusk-400" />
+                这是已有线路的别名 / 另一种写法？挂到已有线路
+                {attachMode && <Check className="ml-auto w-3.5 h-3.5 text-dusk-400" />}
+              </button>
+              {attachMode && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {routeGroups
+                    .filter((g) => g.canonical !== form.routeName.trim())
+                    .map((g) => (
+                      <button
+                        key={g.canonical}
+                        type="button"
+                        onClick={() => setAttachTarget(g.canonical)}
+                        className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                          attachTarget === g.canonical
+                            ? 'bg-dusk-400 text-teal-950'
+                            : 'bg-teal-800/70 text-mist-300 hover:bg-teal-800'
+                        }`}
+                      >
+                        {g.canonical}
+                        {g.aliases.length > 0 && (
+                          <span className={attachTarget === g.canonical ? 'text-teal-900/70' : 'text-mist-500'}>
+                            {' '}（曾用 {g.aliases.join('、')}）
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                </div>
+              )}
+              {attachMode && attachTarget && (
+                <p className="mt-2 text-[11px] leading-relaxed text-dusk-300/80">
+                  保存后「{form.routeName || '新线路名'}」将并入「{attachTarget}」，
+                  目标名称保留，当前名称记作曾用名；记录的原编号、采样时刻与笔记都不会改动。
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="text-mist-300 text-xs mb-1 flex items-center gap-1"><Armchair className="w-3 h-3" />座位方向</label>
             <div className="flex gap-2">

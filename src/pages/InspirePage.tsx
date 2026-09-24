@@ -8,6 +8,7 @@ import {
   formatTimestamp,
   getTimeOfDay,
 } from '@/utils/sceneHelpers'
+import { resolveCanonicalName } from '@/services/routeRelations'
 import { Lightbulb, RefreshCw, Quote, Bus, ArrowRight } from 'lucide-react'
 
 export default function InspirePage() {
@@ -108,7 +109,14 @@ export default function InspirePage() {
             <div className="flex items-center justify-between text-sm text-mist-400">
               <div className="flex items-center gap-2">
                 <ArrowRight className="w-3.5 h-3.5 text-dusk-400" />
-                <span className="text-mist-100 font-medium">{randomScene.routeName}</span>
+                <span className="text-mist-100 font-medium">
+                  {resolveCanonicalName(randomScene.routeName)}
+                </span>
+                {resolveCanonicalName(randomScene.routeName) !== randomScene.routeName && (
+                  <span className="rounded bg-dusk-400/10 px-1.5 py-0.5 text-[10px] text-dusk-300">
+                    曾用名 {randomScene.routeName}
+                  </span>
+                )}
                 <span className="text-mist-500">·</span>
                 <span>{randomScene.segment}</span>
               </div>
